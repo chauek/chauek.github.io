@@ -1,5 +1,5 @@
 import Papa from 'papaparse';
-import React, { useState } from 'react';
+import React, { ChangeEvent, useState } from 'react';
 import './App.css';
 import { CountryAllChart } from './Components/CountryAllChart';
 import {
@@ -19,37 +19,84 @@ function App() {
   const recoveredUrl = 'https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_19-covid-Recovered.csv';
 
   const [isLoaded, setLoaded] = useState(false);
+  const [isLoading, setLoading] = useState(false);
   const [byCountry, setByCountry] = useState({} as TByCountry);
   const [countriesByConfirmed, setCountriesByConfirmed] = useState([] as string[]);
   const [byCountrySummary, setByCountrySummary] = useState({} as TByCountrySummary);
+  const [orderBy, setOrderBy] = useState('confirmed' as TByCountrySummaryKey);
+  const [orderDir, setOrderDir] = useState('desc' as 'desc' | 'asc');
+  const [lastOrderBy, setLastOrderBy] = useState('' as TByCountrySummaryKey);
+  const [lastOrderDir, setLastOrderDir] = useState('' as 'desc' | 'asc');
 
-  if (!isLoaded) {
-    Promise.all([getCsvData(confirmedUrl), getCsvData(recoveredUrl), getCsvData(deathsUrl)]).then(([confirmed, recovered, deaths]) => {
-      setLoaded(true);
-      console.log('confirmed', confirmed);
-      console.log('recovered', recovered);
-      console.log('deaths', deaths);
+  if (!isLoading) {
+    if (!isLoaded) {
+      setLoading(true);
+      Promise.all([getCsvData(confirmedUrl), getCsvData(recoveredUrl), getCsvData(deathsUrl)]).then(([confirmed, recovered, deaths]) => {
+        const byCountry: TByCountry = {};
+        addDataToCountry(byCountry, confirmed.data, 'confirmed');
+        addDataToCountry(byCountry, recovered.data, 'recovered');
+        addDataToCountry(byCountry, deaths.data, 'deaths');
+        addActiveDataToCountry(byCountry);
+        console.log('byCountry', byCountry);
+        const byCountrySummary: TByCountrySummary = getCountrySummary(byCountry);
+        console.log('byCountrySummary', byCountrySummary);
+        const countriesByConfirmed: string[] = sortCountriesBy(byCountrySummary, orderBy, orderDir);
+        setLastOrderBy(orderBy);
+        setLastOrderDir(orderDir);
+        setByCountry(byCountry);
+        setByCountrySummary(byCountrySummary);
+        setCountriesByConfirmed(countriesByConfirmed);
+        setLoaded(true);
+        setLoading(false);
+      });
 
-      const byCountry: TByCountry = {};
-      addDataToCountry(byCountry, confirmed.data, 'confirmed');
-      addDataToCountry(byCountry, recovered.data, 'recovered');
-      addDataToCountry(byCountry, deaths.data, 'deaths');
-      addActiveDataToCountry(byCountry);
-      console.log('byCountry', byCountry);
-      const byCountrySummary: TByCountrySummary = getCountrySummary(byCountry);
-      console.log('byCountrySummary', byCountrySummary);
-      setByCountry(byCountry);
-      setByCountrySummary(byCountrySummary);
-      const countriesByConfirmed: string[] = sortCountriesBy(byCountrySummary, 'confirmed');
+    } else if(lastOrderBy !== orderBy || lastOrderDir !== orderDir) {
+      setLoading(true);
+      const countriesByConfirmed: string[] = sortCountriesBy(byCountrySummary, orderBy, orderDir);
+      setLastOrderBy(orderBy);
+      setLastOrderDir(orderDir);
       setCountriesByConfirmed(countriesByConfirmed);
-    });
+      setLoading(false);
+    }
   }
+
+  const handleOrderBySelect = (val: ChangeEvent<HTMLSelectElement>) => {
+    console.log('handleOrderBySelect val', val.target.value);
+    // @ts-ignore
+    setOrderBy(val.target.value);
+  };
+
+  const handleOrderDirSelect = (val: ChangeEvent<HTMLSelectElement>) => {
+    console.log('handleOrderDirSelect val', val.target.value);
+    // @ts-ignore
+    setOrderDir(val.target.value);
+  };
 
   return (
     <div className="App">
-      <header className="App-header">
+      <div className="App-content">
 
+        <header className="header">
+          <h1>Coronavirus COVID-19 Stat Charts</h1>
+        </header>
+
+        {countriesByConfirmed.length > 0 &&
         <div className="container">
+          <div className="row">
+            <div className="col-12">
+              Order by: <select value={orderBy} onChange={handleOrderBySelect}>
+              <option value="confirmed">confirmed</option>
+              <option value="active">active</option>
+              <option value="recovered">recovered</option>
+              <option value="deaths">deaths</option>
+              <option value="firstContactDate">first contact date</option>
+            </select>
+              <select value={orderDir} onChange={handleOrderDirSelect}>
+                <option value="desc">desc</option>
+                <option value="asc">asc</option>
+              </select>
+            </div>
+          </div>
           <div className="row">
             {countriesByConfirmed.map((country, i) => (
               <CountryAllChart
@@ -61,8 +108,9 @@ function App() {
             ))}
           </div>
         </div>
+        }
 
-      </header>
+      </div>
     </div>
   );
 }
@@ -104,7 +152,7 @@ const addDataToCountry = (destination: TByCountry, dataInput: Dictionary<string>
 
     const dateKeys = Object.keys(row).filter(k => k.match(/[0-9/]{6,}/));
     dateKeys.forEach(date => {
-      const reformattedDate = moment(date, 'M/D/YY').format('D.M.YY');
+      const reformattedDate = moment(date, 'M/D/YY').format('YYYY-MM-DD');
       destination[country][key][reformattedDate] = parseInt(row[date]) + (destination[country][key][reformattedDate] | 0);
     });
   }
@@ -114,12 +162,17 @@ const getCountrySummary = (byCountry: TByCountry): TByCountrySummary => {
   const byCountrySummary: TByCountrySummary = {};
   Object.keys(byCountry).forEach((country) => {
     const confKeys = Object.keys(byCountry[country].confirmed);
+    const confVals = Object.values(byCountry[country].confirmed);
     const recKeys = Object.keys(byCountry[country].recovered);
     const deKeys = Object.keys(byCountry[country].deaths);
     const confirmed = byCountry[country].confirmed[confKeys[confKeys.length - 1]];
     const recovered = byCountry[country].recovered[recKeys[recKeys.length - 1]];
     const deaths = byCountry[country].deaths[deKeys[deKeys.length - 1]];
+
+    const firstContactDate = confKeys[confVals.findIndex(n => n > 0)];
+
     byCountrySummary[country] = {
+      firstContactDate,
       confirmed,
       recovered,
       deaths,

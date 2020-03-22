@@ -10,6 +10,7 @@ export interface IByCountryRow {
 }
 
 export interface IByCountrySummaryRow {
+  firstContactDate: string;
   confirmed: number;
   recovered: number;
   deaths: number;

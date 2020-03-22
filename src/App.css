@@ -13,7 +13,7 @@
   }
 }
 
-.App-header {
+.App-content {
   background-color: #282c34;
   min-height: 100vh;
   display: flex;
@@ -22,6 +22,10 @@
   justify-content: center;
   font-size: calc(10px + 2vmin);
   color: white;
+}
+
+.header {
+  min-height: 100px;
 }
 
 .App-link {
@@ -35,6 +39,13 @@
   to {
     transform: rotate(360deg);
   }
+}
+
+.chartBox {
+  background-color: #393f4a;
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+  padding: 0.5rem;
 }
 
 .active {
