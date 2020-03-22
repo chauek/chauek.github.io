@@ -18,4 +18,5 @@ export interface IByCountrySummaryRow {
 
 export type TByCountryRowKey = keyof IByCountryRow;
 export type TByCountry = Dictionary<IByCountryRow>;
+export type TByCountrySummaryKey = keyof IByCountrySummaryRow;
 export type TByCountrySummary = Dictionary<IByCountrySummaryRow>;

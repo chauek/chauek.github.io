@@ -2,7 +2,14 @@ import Papa from 'papaparse';
 import React, { useState } from 'react';
 import './App.css';
 import { CountryAllChart } from './Components/CountryAllChart';
-import { Dictionary, IByCountrySummaryRow, TByCountry, TByCountryRowKey, TByCountrySummary } from './types';
+import {
+  Dictionary,
+  IByCountrySummaryRow,
+  TByCountry,
+  TByCountryRowKey,
+  TByCountrySummary,
+  TByCountrySummaryKey,
+} from './types';
 import moment from 'moment';
 
 function App() {
@@ -33,7 +40,7 @@ function App() {
       console.log('byCountrySummary', byCountrySummary);
       setByCountry(byCountry);
       setByCountrySummary(byCountrySummary);
-      const countriesByConfirmed: string[] = Object.keys(byCountry);
+      const countriesByConfirmed: string[] = sortCountriesBy(byCountrySummary, 'confirmed');
       setCountriesByConfirmed(countriesByConfirmed);
     });
   }
@@ -59,6 +66,15 @@ function App() {
     </div>
   );
 }
+
+const sortCountriesBy = (byCountrySummary: TByCountrySummary, key: TByCountrySummaryKey, order: 'desc' | 'asc' = 'desc') => Object.keys(byCountrySummary).sort((c1: string, c2: string) => {
+  const v1 = byCountrySummary[c1][key];
+  const v2 = byCountrySummary[c2][key];
+  if (order === 'desc') {
+    return v1 === v2 ? 0 : v1 < v2 ? 1 : -1;
+  }
+  return v1 === v2 ? 0 : v1 > v2 ? 1 : -1;
+});
 
 const addActiveDataToCountry = (destination: TByCountry) => {
   const countries = Object.keys(destination);
