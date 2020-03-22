@@ -1,77 +1,117 @@
-import React from 'react';
 import Papa from 'papaparse';
-import logo from './logo.svg';
+import React, { useState } from 'react';
 import './App.css';
-import {Line} from 'react-chartjs-2';
+import { CountryAllChart } from './Components/CountryAllChart';
+import { Dictionary, IByCountrySummaryRow, TByCountry, TByCountryRowKey, TByCountrySummary } from './types';
+import moment from 'moment';
 
 function App() {
 
   const confirmedUrl = 'https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_19-covid-Confirmed.csv';
-  getCsvData(confirmedUrl).then(confirmed => {
-    console.log('confirmed', confirmed);
-  });
-
   const deathsUrl = 'https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_19-covid-Deaths.csv';
-  getCsvData(deathsUrl).then(deaths => {
-    console.log('deaths', deaths);
-  });
-
   const recoveredUrl = 'https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/time_series_19-covid-Recovered.csv';
-  getCsvData(recoveredUrl).then(recovered => {
-    console.log('recovered', recovered);
-  });
 
-  const data = {
-    labels: ['January', 'February', 'March', 'April', 'May', 'June', 'July'],
-    datasets: [
-      {
-        label: 'My First dataset',
-        fill: false,
-        lineTension: 0.1,
-        backgroundColor: 'rgba(75,192,192,0.4)',
-        borderColor: 'rgba(75,192,192,1)',
-        borderCapStyle: 'butt',
-        borderDash: [],
-        borderDashOffset: 0.0,
-        borderJoinStyle: 'miter',
-        pointBorderColor: 'rgba(75,192,192,1)',
-        pointBackgroundColor: '#fff',
-        pointBorderWidth: 1,
-        pointHoverRadius: 5,
-        pointHoverBackgroundColor: 'rgba(75,192,192,1)',
-        pointHoverBorderColor: 'rgba(220,220,220,1)',
-        pointHoverBorderWidth: 2,
-        pointRadius: 1,
-        pointHitRadius: 10,
-        data: [65, 59, 80, 81, 56, 55, 40]
-      }
-    ]
-  };
+  const [isLoaded, setLoaded] = useState(false);
+  const [byCountry, setByCountry] = useState({} as TByCountry);
+  const [countriesByConfirmed, setCountriesByConfirmed] = useState([] as string[]);
+  const [byCountrySummary, setByCountrySummary] = useState({} as TByCountrySummary);
 
+  if (!isLoaded) {
+    Promise.all([getCsvData(confirmedUrl), getCsvData(recoveredUrl), getCsvData(deathsUrl)]).then(([confirmed, recovered, deaths]) => {
+      setLoaded(true);
+      console.log('confirmed', confirmed);
+      console.log('recovered', recovered);
+      console.log('deaths', deaths);
+
+      const byCountry: TByCountry = {};
+      addDataToCountry(byCountry, confirmed.data, 'confirmed');
+      addDataToCountry(byCountry, recovered.data, 'recovered');
+      addDataToCountry(byCountry, deaths.data, 'deaths');
+      addActiveDataToCountry(byCountry);
+      console.log('byCountry', byCountry);
+      const byCountrySummary: TByCountrySummary = getCountrySummary(byCountry);
+      console.log('byCountrySummary', byCountrySummary);
+      setByCountry(byCountry);
+      setByCountrySummary(byCountrySummary);
+      const countriesByConfirmed: string[] = Object.keys(byCountry);
+      setCountriesByConfirmed(countriesByConfirmed);
+    });
+  }
 
   return (
     <div className="App">
       <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo"/>
-        <p>
-          Edit <code>src/App.tsx</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
 
-        // @ts-ignore
-        <Line data={data} />
+        <div className="container">
+          <div className="row">
+            {countriesByConfirmed.map((country, i) => (
+              <CountryAllChart
+                country={country}
+                summary={byCountrySummary[country]}
+                data={byCountry[country]}
+                key={country}
+              ></CountryAllChart>
+            ))}
+          </div>
+        </div>
 
       </header>
     </div>
   );
 }
+
+const addActiveDataToCountry = (destination: TByCountry) => {
+  const countries = Object.keys(destination);
+  for (let i = 0; i < countries.length; i += 1) {
+    const country = countries[i];
+    const countryRow = destination[country];
+    const dates = Object.keys(countryRow.confirmed);
+    for (let j = 0; j < dates.length; j += 1) {
+      const date = dates[j];
+      countryRow.active[date] = countryRow.confirmed[date] - countryRow.recovered[date] - countryRow.deaths[date];
+    }
+  }
+};
+
+const addDataToCountry = (destination: TByCountry, dataInput: Dictionary<string>[], key: TByCountryRowKey) => {
+  for (let i = 0; i < dataInput.length; i += 1) {
+    const row = dataInput[i];
+    const country = row['Country/Region'];
+    if (!destination[country]) {
+      destination[country] = {
+        confirmed: {},
+        recovered: {},
+        deaths: {},
+        active: {},
+      };
+    }
+
+    const dateKeys = Object.keys(row).filter(k => k.match(/[0-9/]{6,}/));
+    dateKeys.forEach(date => {
+      const reformattedDate = moment(date, 'M/D/YY').format('D.M.YY');
+      destination[country][key][reformattedDate] = parseInt(row[date]) + (destination[country][key][reformattedDate] | 0);
+    });
+  }
+};
+
+const getCountrySummary = (byCountry: TByCountry): TByCountrySummary => {
+  const byCountrySummary: TByCountrySummary = {};
+  Object.keys(byCountry).forEach((country) => {
+    const confKeys = Object.keys(byCountry[country].confirmed);
+    const recKeys = Object.keys(byCountry[country].recovered);
+    const deKeys = Object.keys(byCountry[country].deaths);
+    const confirmed = byCountry[country].confirmed[confKeys[confKeys.length - 1]];
+    const recovered = byCountry[country].recovered[recKeys[recKeys.length - 1]];
+    const deaths = byCountry[country].deaths[deKeys[deKeys.length - 1]];
+    byCountrySummary[country] = {
+      confirmed,
+      recovered,
+      deaths,
+      active: confirmed - recovered - deaths,
+    };
+  });
+  return byCountrySummary;
+};
 
 async function getCsvData(url: string) {
   let csvData = await fetchCsv(url);

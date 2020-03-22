@@ -36,3 +36,19 @@
     transform: rotate(360deg);
   }
 }
+
+.active {
+  color: rgb(255,122,54);
+}
+
+.confirmed {
+  color: rgb(99,255,255);
+}
+
+.recovered {
+  color: rgb(113,192,56);
+}
+
+.deaths {
+  color: rgb(188,192,187);
+}
